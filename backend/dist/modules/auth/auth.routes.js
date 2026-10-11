@@ -1,0 +1,15 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const auth_controller_js_1 = require("./auth.controller.js");
+const authentication_js_1 = require("../../middleware/authentication.js");
+const async_handler_js_1 = require("../../middleware/async-handler.js");
+const validation_js_1 = require("../../middleware/validation.js");
+const rate_limit_js_1 = require("../../middleware/rate-limit.js");
+const router = (0, express_1.Router)();
+router.post('/register', rate_limit_js_1.authLimiter, (0, validation_js_1.validateBody)(auth_controller_js_1.registerSchema), (0, async_handler_js_1.asyncHandler)(auth_controller_js_1.register));
+router.post('/login', rate_limit_js_1.authLimiter, (0, validation_js_1.validateBody)(auth_controller_js_1.loginSchema), (0, async_handler_js_1.asyncHandler)(auth_controller_js_1.login));
+router.post('/logout', authentication_js_1.authenticateToken, (0, async_handler_js_1.asyncHandler)(auth_controller_js_1.logout));
+router.get('/me', authentication_js_1.authenticateToken, (0, async_handler_js_1.asyncHandler)(auth_controller_js_1.getCurrentUser));
+router.post('/forgot-password', rate_limit_js_1.authLimiter, (0, async_handler_js_1.asyncHandler)(auth_controller_js_1.forgotPassword));
+exports.default = router;

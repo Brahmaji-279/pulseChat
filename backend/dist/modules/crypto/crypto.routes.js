@@ -1,0 +1,15 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const crypto_controller_js_1 = require("./crypto.controller.js");
+const authentication_js_1 = require("../../middleware/authentication.js");
+const async_handler_js_1 = require("../../middleware/async-handler.js");
+const validation_js_1 = require("../../middleware/validation.js");
+const rate_limit_js_1 = require("../../middleware/rate-limit.js");
+const router = (0, express_1.Router)();
+router.post('/keys', authentication_js_1.authenticateToken, rate_limit_js_1.apiLimiter, (0, validation_js_1.validateBody)(crypto_controller_js_1.registerKeySchema), (0, async_handler_js_1.asyncHandler)(crypto_controller_js_1.registerPublicKey));
+router.get('/keys/:username', rate_limit_js_1.apiLimiter, (0, async_handler_js_1.asyncHandler)(crypto_controller_js_1.getPublicKeysForUser));
+router.get('/keys/:username/:keyId', rate_limit_js_1.apiLimiter, (0, async_handler_js_1.asyncHandler)(crypto_controller_js_1.getSpecificKey));
+router.post('/keys/:keyId/revoke', authentication_js_1.authenticateToken, (0, async_handler_js_1.asyncHandler)(crypto_controller_js_1.revokeKey));
+router.get('/fingerprint/:username', rate_limit_js_1.apiLimiter, (0, async_handler_js_1.asyncHandler)(crypto_controller_js_1.getUserFingerprint));
+exports.default = router;

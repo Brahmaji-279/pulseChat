@@ -1,0 +1,17 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const contacts_controller_js_1 = require("./contacts.controller.js");
+const authentication_js_1 = require("../../middleware/authentication.js");
+const async_handler_js_1 = require("../../middleware/async-handler.js");
+const router = (0, express_1.Router)();
+router.use(authentication_js_1.authenticateToken);
+router.get('/', (0, async_handler_js_1.asyncHandler)(contacts_controller_js_1.getContacts));
+router.post('/requests', (0, async_handler_js_1.asyncHandler)(contacts_controller_js_1.sendContactRequest));
+router.get('/requests', (0, async_handler_js_1.asyncHandler)(contacts_controller_js_1.getContactRequests));
+router.patch('/requests/:id', (0, async_handler_js_1.asyncHandler)(contacts_controller_js_1.respondContactRequest));
+router.delete('/:id', (0, async_handler_js_1.asyncHandler)(contacts_controller_js_1.deleteContact));
+router.post('/block/:id', (0, async_handler_js_1.asyncHandler)(contacts_controller_js_1.blockUser));
+router.delete('/block/:id', (0, async_handler_js_1.asyncHandler)(contacts_controller_js_1.unblockUser));
+router.get('/blocked/list', (0, async_handler_js_1.asyncHandler)(contacts_controller_js_1.getBlockedUsers));
+exports.default = router;

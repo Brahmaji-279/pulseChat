@@ -1,0 +1,14 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const messages_controller_js_1 = require("./messages.controller.js");
+const authentication_js_1 = require("../../middleware/authentication.js");
+const async_handler_js_1 = require("../../middleware/async-handler.js");
+const validation_js_1 = require("../../middleware/validation.js");
+const router = (0, express_1.Router)();
+router.use(authentication_js_1.authenticateToken);
+router.get('/conversations/:id/messages', (0, async_handler_js_1.asyncHandler)(messages_controller_js_1.getConversationMessages));
+router.post('/conversations/:id/messages', (0, validation_js_1.validateBody)(messages_controller_js_1.sendEncryptedMessageSchema), (0, async_handler_js_1.asyncHandler)(messages_controller_js_1.sendEncryptedMessage));
+router.patch('/messages/:id/status', (0, async_handler_js_1.asyncHandler)(messages_controller_js_1.updateMessageStatus));
+router.delete('/messages/:id', (0, async_handler_js_1.asyncHandler)(messages_controller_js_1.deleteMessage));
+exports.default = router;

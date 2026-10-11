@@ -1,0 +1,15 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const users_controller_js_1 = require("./users.controller.js");
+const authentication_js_1 = require("../../middleware/authentication.js");
+const async_handler_js_1 = require("../../middleware/async-handler.js");
+const validation_js_1 = require("../../middleware/validation.js");
+const upload_js_1 = require("../../middleware/upload.js");
+const rate_limit_js_1 = require("../../middleware/rate-limit.js");
+const router = (0, express_1.Router)();
+router.get('/search', authentication_js_1.authenticateToken, rate_limit_js_1.apiLimiter, (0, async_handler_js_1.asyncHandler)(users_controller_js_1.searchUsers));
+router.get('/:username', rate_limit_js_1.apiLimiter, (0, async_handler_js_1.asyncHandler)(users_controller_js_1.getUserByUsername));
+router.patch('/me', authentication_js_1.authenticateToken, (0, validation_js_1.validateBody)(users_controller_js_1.updateProfileSchema), (0, async_handler_js_1.asyncHandler)(users_controller_js_1.updateProfile));
+router.post('/me/photo', authentication_js_1.authenticateToken, upload_js_1.uploadMemory.single('photo'), upload_js_1.processSecureUpload, (0, async_handler_js_1.asyncHandler)(users_controller_js_1.uploadProfilePhoto));
+exports.default = router;

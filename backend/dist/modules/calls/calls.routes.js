@@ -1,0 +1,13 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const calls_controller_js_1 = require("./calls.controller.js");
+const authentication_js_1 = require("../../middleware/authentication.js");
+const async_handler_js_1 = require("../../middleware/async-handler.js");
+const validation_js_1 = require("../../middleware/validation.js");
+const router = (0, express_1.Router)();
+router.use(authentication_js_1.authenticateToken);
+router.post('/', (0, validation_js_1.validateBody)(calls_controller_js_1.logCallSchema), (0, async_handler_js_1.asyncHandler)(calls_controller_js_1.logCall));
+router.get('/history', (0, async_handler_js_1.asyncHandler)(calls_controller_js_1.getCallHistory));
+router.patch('/:id', (0, async_handler_js_1.asyncHandler)(calls_controller_js_1.updateCallStatus));
+exports.default = router;
