@@ -1,6 +1,8 @@
 import { User, Conversation, DecryptedMessage, CallLog, ContactItem } from '../types/index.js';
 
-const API_BASE = '/api';
+const API_ORIGIN = (import.meta.env.VITE_API_URL
+  || (import.meta.env.PROD ? 'https://pulsechat-api-r7v2.onrender.com' : '')).replace(/\/$/, '');
+const API_BASE = `${API_ORIGIN}/api`;
 
 function getAuthHeader(): Record<string, string> {
   const token = localStorage.getItem('pulse_jwt_fallback');
@@ -34,6 +36,10 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 
 export const api = {
   // Authentication
+  forgotPassword: (body: { email: string }) => request<{ success: boolean }>('/auth/forgot-password', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  }),
   register: (body: any) => request<{ success: boolean; user: User; token: string }>('/auth/register', {
     method: 'POST',
     body: JSON.stringify(body),

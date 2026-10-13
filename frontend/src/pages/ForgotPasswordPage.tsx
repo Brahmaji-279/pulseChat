@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Mail, ArrowLeft, Loader2, CheckCircle, Zap } from 'lucide-react';
 import { AnimatedBackground } from '../components/AnimatedBackground.js';
 import { GlassPanel } from '../components/GlassPanel.js';
+import { api } from '../services/api.js';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -26,12 +27,7 @@ export default function ForgotPasswordPage() {
     setError('');
     try {
       // Call the forgot-password endpoint (anti-enumeration: always show success)
-      await fetch('/api/auth/forgot-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ email: email.trim().toLowerCase() }),
-      });
+      await api.forgotPassword({ email: email.trim().toLowerCase() });
     } catch {
       // Silently ignore network errors — show same success message
     } finally {

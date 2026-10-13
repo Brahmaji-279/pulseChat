@@ -101,6 +101,20 @@ VITE_API_URL=http://localhost:5001
 VITE_SOCKET_URL=http://localhost:5001
 ```
 
+### Production deployment URLs
+Configure these environment variables for the Vercel frontend build and Render backend service:
+
+```env
+# Vercel
+VITE_API_URL=https://pulsechat-api-r7v2.onrender.com
+VITE_SOCKET_URL=https://pulsechat-api-r7v2.onrender.com
+
+# Render
+CLIENT_ORIGIN=https://pulse-chat-pearl.vercel.app
+COOKIE_SECURE=true
+NODE_ENV=production
+```
+
 ---
 
 ## 4. MongoDB Setup Instructions
