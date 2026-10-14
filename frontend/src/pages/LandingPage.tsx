@@ -13,6 +13,8 @@ import {
 } from 'lucide-react';
 import { AnimatedBackground } from '../components/AnimatedBackground.js';
 import { GlassPanel } from '../components/GlassPanel.js';
+import { resolveAssetUrl } from '../services/api.js';
+import { useAuthStore } from '../store/authStore.js';
 
 // ─── Animation Variants ────────────────────────────────────────────────────────
 
@@ -96,7 +98,10 @@ const features: FeatureCard[] = [
 
 // ─── Animated Users Visual ─────────────────────────────────────────────────────
 
-const AnimatedUsersVisual: React.FC = () => (
+const AnimatedUsersVisual: React.FC = () => {
+  const user = useAuthStore((state) => state.user);
+
+  return (
   <div className="relative flex items-center justify-center gap-5 sm:gap-8 my-10 select-none">
     {/* You */}
     <motion.div
@@ -105,8 +110,18 @@ const AnimatedUsersVisual: React.FC = () => (
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.7, ease: 'easeOut', delay: 0.3 }}
     >
-      <div className="w-16 h-16 rounded-full bg-violet-600/20 border border-violet-500/40 flex items-center justify-center shadow-lg shadow-violet-900/30">
+      <div className="relative w-16 h-16 rounded-full bg-violet-600/20 border border-violet-500/40 flex items-center justify-center shadow-lg shadow-violet-900/30">
         <User size={30} className="text-violet-400" />
+        {user?.profilePhoto && (
+          <img
+            src={resolveAssetUrl(user.profilePhoto)}
+            alt={user.displayName || user.username}
+            className="absolute inset-0 w-16 h-16 rounded-full object-cover border border-violet-500/40"
+            onError={(event) => {
+              event.currentTarget.style.display = 'none';
+            }}
+          />
+        )}
       </div>
       <span className="text-xs text-[#F5F5F5]/70 font-mono tracking-widest uppercase">You</span>
     </motion.div>
@@ -212,7 +227,8 @@ const AnimatedUsersVisual: React.FC = () => (
       <span className="text-xs text-[#F5F5F5]/70 font-mono tracking-widest uppercase">Contact</span>
     </motion.div>
   </div>
-);
+  );
+};
 
 // ─── Main Component ────────────────────────────────────────────────────────────
 
