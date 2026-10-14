@@ -5,6 +5,7 @@ import { useAuthStore } from '../store/authStore.js';
 import { GlassPanel } from '../components/GlassPanel.js';
 import { UserAvatar } from '../components/UserAvatar.js';
 import { AnimatedBackground } from '../components/AnimatedBackground.js';
+import { toast } from '../components/ToastNotifications.js';
 
 const containerVariants = {
   hidden: { opacity: 0, y: 20 },
@@ -49,11 +50,17 @@ export default function ProfilePage() {
     if (!file) return;
     setPhotoFile(file);
     const objectUrl = URL.createObjectURL(file);
+    if (photoPreview) URL.revokeObjectURL(photoPreview);
     setPhotoPreview(objectUrl);
 
     setIsUploading(true);
     try {
       await uploadAvatar?.(file);
+      toast.success('Profile photo updated.');
+    } catch (err) {
+      setPhotoPreview(null);
+      URL.revokeObjectURL(objectUrl);
+      toast.error(err instanceof Error ? err.message : 'Profile photo could not be updated.');
     } finally {
       setIsUploading(false);
     }

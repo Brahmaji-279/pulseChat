@@ -19,7 +19,9 @@ const RTC_CONFIG: RTCConfiguration = {
 export class WebRTCManager {
   private peerConnection: RTCPeerConnection | null = null;
   private localStream: MediaStream | null = null;
+  private screenStream: MediaStream | null = null;
   private remoteStream: MediaStream | null = null;
+  private pendingIceCandidates: RTCIceCandidateInit[] = [];
   private onRemoteStreamCallback: ((stream: MediaStream) => void) | null = null;
   private onIceCandidateCallback: ((candidate: RTCIceCandidate) => void) | null = null;
   private onConnectionStateCallback: ((state: RTCPeerConnectionState) => void) | null = null;
@@ -65,7 +67,7 @@ export class WebRTCManager {
   }
 
   public createPeerConnection(): RTCPeerConnection {
-    this.close();
+    this.peerConnection?.close();
 
     const pc = new RTCPeerConnection(RTC_CONFIG);
     this.peerConnection = pc;
@@ -113,6 +115,7 @@ export class WebRTCManager {
   public async handleOffer(offer: RTCSessionDescriptionInit): Promise<RTCSessionDescriptionInit> {
     if (!this.peerConnection) this.createPeerConnection();
     await this.peerConnection!.setRemoteDescription(new RTCSessionDescription(offer));
+    await this.applyPendingIceCandidates();
     const answer = await this.peerConnection!.createAnswer();
     await this.peerConnection!.setLocalDescription(answer);
     return answer;
@@ -121,16 +124,28 @@ export class WebRTCManager {
   public async handleAnswer(answer: RTCSessionDescriptionInit): Promise<void> {
     if (this.peerConnection) {
       await this.peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+      await this.applyPendingIceCandidates();
     }
   }
 
   public async addIceCandidate(candidateInit: RTCIceCandidateInit): Promise<void> {
-    if (this.peerConnection) {
-      try {
-        await this.peerConnection.addIceCandidate(new RTCIceCandidate(candidateInit));
-      } catch (err) {
-        console.warn('[WebRTC ICE Error]', err);
-      }
+    if (!this.peerConnection || !this.peerConnection.remoteDescription) {
+      this.pendingIceCandidates.push(candidateInit);
+      return;
+    }
+
+    try {
+      await this.peerConnection.addIceCandidate(new RTCIceCandidate(candidateInit));
+    } catch (err) {
+      console.warn('[WebRTC ICE Error]', err);
+    }
+  }
+
+  private async applyPendingIceCandidates(): Promise<void> {
+    if (!this.peerConnection?.remoteDescription) return;
+    const candidates = this.pendingIceCandidates.splice(0);
+    for (const candidate of candidates) {
+      await this.addIceCandidate(candidate);
     }
   }
 
@@ -148,9 +163,55 @@ export class WebRTCManager {
         t.enabled = !videoOff;
       });
     }
+    this.screenStream?.getVideoTracks().forEach((t) => {
+      t.enabled = !videoOff;
+    });
+  }
+
+  public async startScreenShare(): Promise<MediaStream> {
+    if (!this.peerConnection || !this.localStream) {
+      throw new Error('The video call is not ready for screen sharing.');
+    }
+    if (!navigator.mediaDevices.getDisplayMedia) {
+      throw new Error('Screen sharing is not supported by this browser.');
+    }
+
+    const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+    const screenTrack = stream.getVideoTracks()[0];
+    const videoSender = this.peerConnection.getSenders().find((sender) => sender.track?.kind === 'video');
+    if (!screenTrack || !videoSender) {
+      stream.getTracks().forEach((track) => track.stop());
+      throw new Error('Screen sharing could not replace the video track.');
+    }
+
+    await videoSender.replaceTrack(screenTrack);
+    this.screenStream = stream;
+    screenTrack.onended = () => {
+      void this.stopScreenShare();
+    };
+    return stream;
+  }
+
+  public async stopScreenShare(): Promise<MediaStream | null> {
+    if (!this.screenStream) return this.localStream;
+    const videoSender = this.peerConnection?.getSenders().find((sender) => sender.track?.kind === 'video');
+    const cameraTrack = this.localStream?.getVideoTracks()[0];
+    if (videoSender) {
+      await videoSender.replaceTrack(cameraTrack || null);
+    }
+    this.screenStream.getTracks().forEach((track) => {
+      track.onended = null;
+      track.stop();
+    });
+    this.screenStream = null;
+    return this.localStream;
   }
 
   public close(): void {
+    if (this.screenStream) {
+      this.screenStream.getTracks().forEach((track) => track.stop());
+      this.screenStream = null;
+    }
     if (this.localStream) {
       this.localStream.getTracks().forEach((t) => t.stop());
       this.localStream = null;
@@ -160,5 +221,6 @@ export class WebRTCManager {
       this.peerConnection = null;
     }
     this.remoteStream = null;
+    this.pendingIceCandidates = [];
   }
 }

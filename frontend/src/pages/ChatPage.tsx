@@ -24,6 +24,8 @@ import { UserAvatar } from '../components/UserAvatar.js';
 import { OnlineIndicator } from '../components/OnlineIndicator.js';
 import { GlassPanel } from '../components/GlassPanel.js';
 import { api } from '../services/api.js';
+import { encryptAttachment } from '../crypto/attachments.js';
+import { DecryptedAttachment } from '../components/DecryptedAttachment.js';
 import { toast } from '../components/ToastNotifications.js';
 
 function formatTime(isoOrMs: string | number | Date): string {
@@ -85,16 +87,17 @@ export default function ChatPage() {
     loadMessages,
     sendMessage,
     selectConversation,
+    leaveConversation,
     sendTyping,
-    setupSocketListeners,
   } = useChatStore();
 
-  const { initiateCall, setupCallSocketListeners } = useCallStore();
+  const { initiateCall } = useCallStore();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [messageText, setMessageText] = useState('');
   const [rightPanelOpen, setRightPanelOpen] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -104,10 +107,10 @@ export default function ChatPage() {
 
   // Setup sockets and load conversations on mount
   useEffect(() => {
-    setupSocketListeners();
-    setupCallSocketListeners();
-    loadConversations();
-  }, [setupSocketListeners, setupCallSocketListeners, loadConversations]);
+    void loadConversations();
+  }, [loadConversations]);
+
+  useEffect(() => () => leaveConversation(), [leaveConversation]);
 
   // Sync route param with active conversation
   useEffect(() => {
@@ -201,13 +204,51 @@ export default function ChatPage() {
 
   const handleCallVoice = useCallback(() => {
     if (!peer) return;
-    initiateCall(peer, 'voice');
+    void initiateCall(peer, 'voice').catch((err) => {
+      toast.error(err instanceof Error ? err.message : 'Could not start the voice call.');
+    });
   }, [peer, initiateCall]);
 
   const handleCallVideo = useCallback(() => {
     if (!peer) return;
-    initiateCall(peer, 'video');
+    void initiateCall(peer, 'video').catch((err) => {
+      toast.error(err instanceof Error ? err.message : 'Could not start the video call.');
+    });
   }, [peer, initiateCall]);
+
+  const handleAttachmentChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file || !conversationId) return;
+
+    if (file.size > 25 * 1024 * 1024) {
+      toast.error('Files must be 25 MB or smaller.');
+      return;
+    }
+
+    setIsUploadingAttachment(true);
+    try {
+      const encryptedAttachment = await encryptAttachment(file);
+      const uploadFile = new File([encryptedAttachment.blob], 'attachment.pulseenc', {
+        type: 'application/octet-stream',
+      });
+      const uploaded = await api.uploadAttachment(conversationId, uploadFile);
+      const isImage = file.type.startsWith('image/');
+      await sendMessage(conversationId, '', {
+        type: isImage ? 'image' : 'file',
+        attachmentUrl: uploaded.url,
+        fileName: file.name,
+        fileSize: file.size,
+        attachmentKey: encryptedAttachment.key,
+        attachmentIv: encryptedAttachment.iv,
+        attachmentMimeType: file.type || 'application/octet-stream',
+      });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'The attachment could not be sent.');
+    } finally {
+      setIsUploadingAttachment(false);
+    }
+  };
 
   const handleBlockUser = async () => {
     if (!peer) return;
@@ -424,7 +465,31 @@ export default function ChatPage() {
                             <span>Unable to display this message</span>
                           </div>
                         ) : (
-                          <p className="whitespace-pre-wrap break-words">{msg.text}</p>
+                          <>
+                            {msg.attachmentUrl && msg.type === 'image' && (
+                              <DecryptedAttachment
+                                url={msg.attachmentUrl}
+                                type="image"
+                                fileName={msg.fileName}
+                                fileSize={msg.fileSize}
+                                keyBase64={msg.attachmentKey}
+                                ivBase64={msg.attachmentIv}
+                                mimeType={msg.attachmentMimeType}
+                              />
+                            )}
+                            {msg.attachmentUrl && msg.type === 'file' && (
+                              <DecryptedAttachment
+                                url={msg.attachmentUrl}
+                                type="file"
+                                fileName={msg.fileName}
+                                fileSize={msg.fileSize}
+                                keyBase64={msg.attachmentKey}
+                                ivBase64={msg.attachmentIv}
+                                mimeType={msg.attachmentMimeType}
+                              />
+                            )}
+                            {msg.text && <p className="whitespace-pre-wrap break-words">{msg.text}</p>}
+                          </>
                         )}
                       </div>
                       <div className={`flex items-center gap-1.5 mt-1 px-1 ${isMine ? 'flex-row-reverse' : ''}`}>
@@ -462,12 +527,19 @@ export default function ChatPage() {
               <div className="flex items-end gap-2 bg-white/5 border border-white/10 rounded-2xl px-3 py-2 focus-within:border-violet-500/50 transition-colors">
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="p-1.5 text-white/40 hover:text-white transition-colors"
-                  title="Attach file"
+                  disabled={isUploadingAttachment}
+                  className="p-1.5 text-white/40 hover:text-white disabled:opacity-40 transition-colors"
+                  title={isUploadingAttachment ? 'Uploading attachment' : 'Attach image or file'}
                 >
-                  <Paperclip className="w-4 h-4" />
+                  <Paperclip className={`w-4 h-4 ${isUploadingAttachment ? 'animate-pulse' : ''}`} />
                 </button>
-                <input ref={fileInputRef} type="file" className="hidden" />
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="hidden"
+                  onChange={handleAttachmentChange}
+                  disabled={isUploadingAttachment}
+                />
 
                 <textarea
                   ref={textareaRef}

@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { WebRTCManager } from '../services/webrtc.js';
-import { getSocket } from '../services/socket.js';
+import { connectSocket, getSocket } from '../services/socket.js';
 import { api } from '../services/api.js';
+import { toast } from '../components/ToastNotifications.js';
 
 export interface CallPeer {
   id: string;
@@ -17,6 +18,7 @@ export interface ActiveCall {
   peer: CallPeer;
   isMuted: boolean;
   isVideoOff: boolean;
+  isScreenSharing: boolean;
   duration: number;
   startedAt?: number;
 }
@@ -35,6 +37,7 @@ interface CallState {
   remoteStream: MediaStream | null;
   connectionState: RTCPeerConnectionState;
   rtcManager: WebRTCManager | null;
+  pendingSignals: Array<{ callId: string; senderId: string; signal: any }>;
   durationInterval: any;
 
   // Actions
@@ -44,7 +47,29 @@ interface CallState {
   endCall: () => void;
   toggleMute: () => void;
   toggleVideo: () => void;
+  toggleScreenShare: () => Promise<void>;
   setupCallSocketListeners: () => void;
+}
+
+async function getConnectedSocket() {
+  const socket = connectSocket();
+  if (socket.connected) return socket;
+
+  await new Promise<void>((resolve, reject) => {
+    const timeout = setTimeout(() => finish(new Error('Call signaling is unavailable. Please try again.')), 10000);
+    const onConnect = () => finish();
+    const onError = () => finish(new Error('Could not connect to the call service.'));
+    const finish = (error?: Error) => {
+      clearTimeout(timeout);
+      socket.off('connect', onConnect);
+      socket.off('connect_error', onError);
+      if (error) reject(error);
+      else resolve();
+    };
+    socket.once('connect', onConnect);
+    socket.once('connect_error', onError);
+  });
+  return socket;
 }
 
 export const useCallStore = create<CallState>((set, get) => ({
@@ -54,13 +79,18 @@ export const useCallStore = create<CallState>((set, get) => ({
   remoteStream: null,
   connectionState: 'new',
   rtcManager: null,
+  pendingSignals: [],
   durationInterval: null,
 
   initiateCall: async (peer: CallPeer, callType: 'voice' | 'video') => {
+    if (get().activeCall || get().incomingCall) {
+      toast.error('Finish the current call before starting another one.');
+      return;
+    }
     const callId = `call_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-    const socket = getSocket();
 
     try {
+      const socket = await getConnectedSocket();
       const rtcManager = new WebRTCManager(
         (remoteStream) => {
           set({ remoteStream });
@@ -101,6 +131,9 @@ export const useCallStore = create<CallState>((set, get) => ({
       set({
         rtcManager,
         localStream,
+        remoteStream: null,
+        connectionState: 'new',
+        pendingSignals: [],
         activeCall: {
           callId,
           callType,
@@ -108,25 +141,24 @@ export const useCallStore = create<CallState>((set, get) => ({
           peer,
           isMuted: false,
           isVideoOff: false,
+          isScreenSharing: false,
           duration: 0,
         },
       });
 
       // Notify recipient
-      if (socket && socket.connected) {
-        socket.emit('call:initiate', {
-          recipientId: peer.id,
-          callType,
-          callId,
-        });
+      socket.emit('call:initiate', {
+        recipientId: peer.id,
+        callType,
+        callId,
+      });
 
-        const offer = await rtcManager.createOffer();
-        socket.emit('call:signal', {
-          recipientId: peer.id,
-          callId,
-          signal: offer,
-        });
-      }
+      const offer = await rtcManager.createOffer();
+      socket.emit('call:signal', {
+        recipientId: peer.id,
+        callId,
+        signal: offer,
+      });
 
       // Log call initiation to backend
       api.logCall({
@@ -145,10 +177,10 @@ export const useCallStore = create<CallState>((set, get) => ({
     const incoming = get().incomingCall;
     if (!incoming) return;
 
-    const socket = getSocket();
     const { callId, callType, initiator } = incoming;
 
     try {
+      const socket = await getConnectedSocket();
       const rtcManager = new WebRTCManager(
         (remoteStream) => {
           set({ remoteStream });
@@ -189,24 +221,31 @@ export const useCallStore = create<CallState>((set, get) => ({
       set({
         rtcManager,
         localStream,
+        remoteStream: null,
+        connectionState: 'new',
         incomingCall: null,
         activeCall: {
           callId,
           callType,
-          status: 'connected',
+          status: 'incoming',
           peer: initiator,
           isMuted: false,
           isVideoOff: false,
+          isScreenSharing: false,
           duration: 0,
           startedAt: Date.now(),
         },
       });
 
-      if (socket && socket.connected) {
-        socket.emit('call:accept', {
-          callId,
-          initiatorId: initiator.id,
-        });
+      socket.emit('call:accept', {
+        callId,
+        initiatorId: initiator.id,
+      });
+
+      const pendingSignals = get().pendingSignals.filter((signal) => signal.callId === callId);
+      set({ pendingSignals: [] });
+      for (const pendingSignal of pendingSignals) {
+        await handleCallSignal(pendingSignal, rtcManager, socket);
       }
     } catch (err: any) {
       console.error('[CallStore] Failed to accept call:', err);
@@ -226,7 +265,10 @@ export const useCallStore = create<CallState>((set, get) => ({
       });
     }
 
-    set({ incomingCall: null });
+    set({
+      incomingCall: null,
+      pendingSignals: get().pendingSignals.filter((signal) => signal.callId !== incoming?.callId),
+    });
   },
 
   endCall: () => {
@@ -262,6 +304,7 @@ export const useCallStore = create<CallState>((set, get) => ({
       localStream: null,
       remoteStream: null,
       rtcManager: null,
+      pendingSignals: [],
       durationInterval: null,
       connectionState: 'closed',
     });
@@ -285,6 +328,43 @@ export const useCallStore = create<CallState>((set, get) => ({
     set({ activeCall: { ...activeCall, isVideoOff: nextVideoOff } });
   },
 
+  toggleScreenShare: async () => {
+    const { activeCall, rtcManager } = get();
+    if (!activeCall || activeCall.callType !== 'video' || !rtcManager) return;
+
+    try {
+      if (activeCall.isScreenSharing) {
+        const cameraStream = await rtcManager.stopScreenShare();
+        set({
+          localStream: cameraStream,
+          activeCall: { ...activeCall, isScreenSharing: false },
+        });
+      } else {
+        const screenStream = await rtcManager.startScreenShare();
+        set({
+          localStream: screenStream,
+          activeCall: { ...activeCall, isScreenSharing: true },
+        });
+        screenStream.getVideoTracks()[0].onended = () => {
+          void rtcManager.stopScreenShare().then((cameraStream) => {
+            const current = get().activeCall;
+            if (current?.callId === activeCall.callId) {
+              set({
+                localStream: cameraStream,
+                activeCall: { ...current, isScreenSharing: false },
+              });
+            }
+          }).catch((err) => {
+            console.error('[CallStore] Failed to stop screen sharing:', err);
+            toast.error('Could not stop screen sharing cleanly.');
+          });
+        };
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Screen sharing could not be started.');
+    }
+  },
+
   setupCallSocketListeners: () => {
     const socket = getSocket();
     if (!socket) return;
@@ -294,11 +374,12 @@ export const useCallStore = create<CallState>((set, get) => ({
     socket.off('call:rejected');
     socket.off('call:ended');
     socket.off('call:signal');
+    socket.off('call:error');
 
     // Incoming Call
     socket.on('call:incoming', (payload: any) => {
       // If already in a call, reject as busy
-      if (get().activeCall) {
+      if (get().activeCall || get().incomingCall) {
         socket.emit('call:reject', {
           callId: payload.callId,
           initiatorId: payload.initiator.id,
@@ -314,15 +395,8 @@ export const useCallStore = create<CallState>((set, get) => ({
           initiator: payload.initiator,
           timestamp: payload.timestamp || Date.now(),
         },
+        pendingSignals: get().pendingSignals.filter((signal) => signal.callId === payload.callId),
       });
-    });
-
-    // Call Accepted by peer
-    socket.on('call:accepted', () => {
-      const cur = get().activeCall;
-      if (cur) {
-        set({ activeCall: { ...cur, status: 'connected' } });
-      }
     });
 
     // Call Rejected by peer
@@ -337,22 +411,45 @@ export const useCallStore = create<CallState>((set, get) => ({
 
     // WebRTC Signaling (SDP Offer/Answer & ICE Candidates)
     socket.on('call:signal', async (payload: { callId: string; senderId: string; signal: any }) => {
-      const { rtcManager } = get();
-      if (!rtcManager) return;
-
-      const { signal } = payload;
-      if (signal.type === 'offer') {
-        const answer = await rtcManager.handleOffer(signal);
-        socket.emit('call:signal', {
-          recipientId: payload.senderId,
-          callId: payload.callId,
-          signal: answer,
-        });
-      } else if (signal.type === 'answer') {
-        await rtcManager.handleAnswer(signal);
-      } else if (signal.type === 'candidate' && signal.candidate) {
-        await rtcManager.addIceCandidate(signal.candidate);
+      const { rtcManager, activeCall, incomingCall } = get();
+      if (
+        (activeCall && activeCall.callId !== payload.callId) ||
+        (incomingCall && incomingCall.callId !== payload.callId)
+      ) return;
+      if (!rtcManager) {
+        set((state) => ({ pendingSignals: [...state.pendingSignals, payload] }));
+        return;
       }
+      await handleCallSignal(payload, rtcManager, socket);
+    });
+
+    socket.on('call:error', (payload: { error?: string }) => {
+      toast.error(payload.error || 'The call could not be connected.');
+      get().endCall();
     });
   },
 }));
+
+async function handleCallSignal(
+  payload: { callId: string; senderId: string; signal: any },
+  rtcManager: WebRTCManager,
+  socket: ReturnType<typeof getSocket>
+): Promise<void> {
+  try {
+    if (payload.signal.type === 'offer') {
+      const answer = await rtcManager.handleOffer(payload.signal);
+      socket.emit('call:signal', {
+        recipientId: payload.senderId,
+        callId: payload.callId,
+        signal: answer,
+      });
+    } else if (payload.signal.type === 'answer') {
+      await rtcManager.handleAnswer(payload.signal);
+    } else if (payload.signal.type === 'candidate' && payload.signal.candidate) {
+      await rtcManager.addIceCandidate(payload.signal.candidate);
+    }
+  } catch (err) {
+    console.error('[CallStore] Failed to process call signaling:', err);
+    toast.error('Call setup failed. Please end the call and try again.');
+  }
+}

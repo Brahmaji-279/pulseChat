@@ -1,8 +1,13 @@
 import { User, Conversation, DecryptedMessage, CallLog, ContactItem } from '../types/index.js';
 
-const API_ORIGIN = (import.meta.env.VITE_API_URL
+export const API_ORIGIN = (import.meta.env.VITE_API_URL
   || (import.meta.env.PROD ? 'https://pulsechat-api-r7v2.onrender.com' : '')).replace(/\/$/, '');
 const API_BASE = `${API_ORIGIN}/api`;
+
+export function resolveAssetUrl(url?: string): string | undefined {
+  if (!url || /^(?:https?:|data:|blob:)/i.test(url)) return url;
+  return `${API_ORIGIN}${url.startsWith('/') ? '' : '/'}${url}`;
+}
 
 function getAuthHeader(): Record<string, string> {
   const token = localStorage.getItem('pulse_jwt_fallback');
@@ -77,6 +82,19 @@ export const api = {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Photo upload failed');
     return data;
+  },
+  uploadAttachment: async (conversationId: string, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await fetch(`${API_BASE}/conversations/${encodeURIComponent(conversationId)}/attachments`, {
+      method: 'POST',
+      body: formData,
+      credentials: 'include',
+      headers: { ...getAuthHeader() },
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'File upload failed');
+    return data as { success: boolean; url: string };
   },
 
   // Contacts & Blocking

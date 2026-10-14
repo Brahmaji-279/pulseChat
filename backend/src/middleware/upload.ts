@@ -27,6 +27,13 @@ export const uploadMemory = multer({
   },
 });
 
+export const attachmentUploadMemory = multer({
+  storage,
+  limits: {
+    fileSize: 25 * 1024 * 1024 + 16,
+  },
+});
+
 function verifyMagicBytes(buffer: Buffer): 'jpg' | 'png' | 'webp' | null {
   if (buffer.length < 12) return null;
 
@@ -88,6 +95,40 @@ export async function processSecureUpload(
     await fs.promises.writeFile(destinationPath, req.file.buffer);
 
     // Save relative public path onto request object
+    (req as Request & { savedFileUrl?: string }).savedFileUrl = `/uploads/${secureFilename}`;
+    next();
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function processAttachmentUpload(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    if (!req.file) {
+      res.status(400).json({ success: false, error: 'No file uploaded' });
+      return;
+    }
+
+    const extension = path.extname(req.file.originalname).toLowerCase();
+    const unsafeExtensions = new Set([
+      '.bat', '.cmd', '.com', '.cpl', '.dll', '.exe', '.hta', '.html', '.htm',
+      '.jar', '.js', '.jse', '.mjs', '.msi', '.php', '.ps1', '.py', '.rb',
+      '.scr', '.sh', '.svg', '.vbs', '.wsf', '.xhtml',
+    ]);
+    if (unsafeExtensions.has(extension)) {
+      res.status(400).json({ success: false, error: 'This file type cannot be shared' });
+      return;
+    }
+
+    const safeExtension = /^\.[a-z0-9]{1,10}$/.test(extension) ? extension : '';
+    const secureFilename = `${crypto.randomUUID()}${safeExtension}`;
+    const destinationPath = path.join(ENV.UPLOAD_DIR, secureFilename);
+    await fs.promises.writeFile(destinationPath, req.file.buffer);
+
     (req as Request & { savedFileUrl?: string }).savedFileUrl = `/uploads/${secureFilename}`;
     next();
   } catch (err) {

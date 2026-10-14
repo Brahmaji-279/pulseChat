@@ -57,6 +57,9 @@ export interface DecryptedMessage {
   attachmentUrl?: string;
   fileName?: string;
   fileSize?: number;
+  attachmentKey?: string;
+  attachmentIv?: string;
+  attachmentMimeType?: string;
   deliveryStatus: 'sent' | 'delivered' | 'read';
   timestamp: number;
   createdAt: string;

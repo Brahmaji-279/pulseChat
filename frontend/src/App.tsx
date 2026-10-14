@@ -10,6 +10,8 @@ import { AnimatePresence } from 'framer-motion';
 import { AnimatedBackground } from './components/AnimatedBackground.js';
 import { Navbar } from './components/Navbar.js';
 import { useAuthStore } from './store/authStore.js';
+import { useChatStore } from './store/chatStore.js';
+import { useCallStore } from './store/callStore.js';
 
 // Lazy-loaded pages for code splitting
 import { lazy, Suspense } from 'react';
@@ -157,13 +159,20 @@ function AnimatedRoutes() {
 
 // App root — wraps everything
 function AppContent() {
-  const { checkAuth } = useAuthStore();
+  const { checkAuth, isAuthenticated } = useAuthStore();
   const location = useLocation();
 
   // Check authentication on mount
   useEffect(() => {
     checkAuth();
   }, [checkAuth]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    useChatStore.getState().setupSocketListeners();
+    useCallStore.getState().setupCallSocketListeners();
+    void useChatStore.getState().loadConversations();
+  }, [isAuthenticated]);
 
   // Pages that show full-screen background (no navbar overlay needed)
   const noNavbarPages: string[] = [];

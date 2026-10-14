@@ -50,7 +50,7 @@ export default function ForgotPasswordPage() {
             <Zap size={22} className="text-violet-400" />
           </div>
           <h1 className="text-xl font-semibold text-white">
-            Chat<span className="text-violet-400">Flow</span>
+            Pulse<span className="text-violet-400">Chat</span>
           </h1>
         </motion.div>
 

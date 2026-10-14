@@ -2,7 +2,7 @@ import React, { useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   PhoneOff, Mic, MicOff, Video, VideoOff, Maximize2,
-  Signal, AlertTriangle, Phone
+  Signal, AlertTriangle, Phone, Monitor
 } from 'lucide-react';
 import { useCallStore } from '../store/callStore.js';
 import { UserAvatar } from './UserAvatar.js';
@@ -22,15 +22,26 @@ export const CallScreen: React.FC = () => {
     endCall,
     toggleMute,
     toggleVideo,
+    toggleScreenShare,
   } = useCallStore();
 
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteAudioRef = useRef<HTMLAudioElement>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
 
   // Attach remote stream to video element
   useEffect(() => {
     if (remoteVideoRef.current && remoteStream) {
       remoteVideoRef.current.srcObject = remoteStream;
+    }
+  }, [remoteStream]);
+
+  useEffect(() => {
+    if (remoteAudioRef.current && remoteStream) {
+      remoteAudioRef.current.srcObject = remoteStream;
+      void remoteAudioRef.current.play().catch((err) => {
+        console.warn('[CallScreen] Remote audio playback was blocked:', err);
+      });
     }
   }, [remoteStream]);
 
@@ -64,6 +75,7 @@ export const CallScreen: React.FC = () => {
           exit={{ opacity: 0 }}
           className="fixed inset-0 z-[300] bg-[#030303]"
         >
+          {!isVideo && <audio ref={remoteAudioRef} autoPlay />}
           {isVideo ? (
             /* ============ VIDEO CALL LAYOUT ============ */
             <div className="relative w-full h-full bg-black">
@@ -97,7 +109,7 @@ export const CallScreen: React.FC = () => {
                   autoPlay
                   playsInline
                   muted
-                  className="w-full h-full object-cover scale-x-[-1]"
+                  className={`w-full h-full object-cover ${activeCall.isScreenSharing ? '' : 'scale-x-[-1]'}`}
                 />
                 {activeCall.isVideoOff && (
                   <div className="absolute inset-0 bg-zinc-900 flex items-center justify-center">
@@ -143,6 +155,16 @@ export const CallScreen: React.FC = () => {
                     title={activeCall.isVideoOff ? 'Turn on camera' : 'Turn off camera'}
                   >
                     {activeCall.isVideoOff ? <VideoOff size={18} className="text-red-400" /> : <Video size={18} className="text-white" />}
+                  </button>
+                  <button
+                    onClick={() => void toggleScreenShare()}
+                    className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
+                      activeCall.isScreenSharing ? 'bg-violet-500/30 border border-violet-400/50 text-violet-200' : 'bg-white/10 hover:bg-white/20 text-white'
+                    }`}
+                    title={activeCall.isScreenSharing ? 'Stop sharing screen' : 'Share screen'}
+                    aria-label={activeCall.isScreenSharing ? 'Stop sharing screen' : 'Share screen'}
+                  >
+                    <Monitor size={18} />
                   </button>
                 </div>
               </div>

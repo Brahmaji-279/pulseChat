@@ -128,7 +128,7 @@ export default function RegisterPage() {
               <Zap className="w-7 h-7 text-violet-400" />
             </div>
             <h1 className="text-2xl font-bold text-white tracking-tight">
-              Chat<span className="text-violet-400">Flow</span>
+              Pulse<span className="text-violet-400">Chat</span>
             </h1>
             <p className="text-white/40 text-sm mt-1">Create your account</p>
           </motion.div>

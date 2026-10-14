@@ -29,6 +29,9 @@ export interface PlaintextMessagePayload {
   attachmentUrl?: string;
   fileName?: string;
   fileSize?: number;
+  attachmentKey?: string;
+  attachmentIv?: string;
+  attachmentMimeType?: string;
   replyToId?: string;
 }
 

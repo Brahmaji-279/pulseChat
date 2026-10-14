@@ -18,6 +18,8 @@ import {
   Zap,
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore.js';
+import { useChatStore } from '../store/chatStore.js';
+import { useCallStore } from '../store/callStore.js';
 import { UserAvatar } from './UserAvatar.js';
 
 const navLinks = [
@@ -33,6 +35,10 @@ export const Navbar: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, isAuthenticated, logout } = useAuthStore();
+  const unreadMessages = useChatStore((state) =>
+    state.conversations.reduce((total, conversation) => total + conversation.unreadCount, 0)
+  );
+  const hasIncomingCall = useCallStore((state) => Boolean(state.incomingCall));
   const [mobileOpen, setMobileOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -68,6 +74,24 @@ export const Navbar: React.FC = () => {
     return location.pathname.startsWith(to);
   };
 
+  const openNotifications = () => {
+    navigate(hasIncomingCall ? '/calls' : '/chat');
+  };
+
+  const renderNavBadge = (to: string) => {
+    if (to === '/chat' && unreadMessages > 0) {
+      return (
+        <span className="ml-1.5 min-w-4 h-4 px-1 rounded-full bg-violet-500 text-[9px] leading-4 text-white text-center">
+          {unreadMessages > 99 ? '99+' : unreadMessages}
+        </span>
+      );
+    }
+    if (to === '/calls' && hasIncomingCall) {
+      return <span className="ml-1.5 w-2 h-2 rounded-full bg-cyan-400 animate-pulse" aria-label="Incoming call" />;
+    }
+    return null;
+  };
+
   return (
     <>
       <header
@@ -93,17 +117,19 @@ export const Navbar: React.FC = () => {
 
           {/* CENTER: Navigation links (desktop) */}
           <nav className="hidden md:flex items-center gap-1">
-            {navLinks.map(({ to, label }) => (
+            {navLinks.map(({ to, label, icon: Icon }) => (
               <Link
                 key={to}
                 to={to}
-                className={`relative px-3 py-1.5 text-[13px] font-medium rounded-lg transition-all duration-150 ${
+                className={`relative flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium rounded-lg transition-all duration-150 ${
                   isActive(to)
                     ? 'text-white'
                     : 'text-white/50 hover:text-white/80 hover:bg-white/5'
-                }`}
+                } ${to === '/chat' && unreadMessages > 0 ? 'text-violet-200' : ''} ${to === '/calls' && hasIncomingCall ? 'text-cyan-200' : ''}`}
               >
+                <Icon size={14} className={to === '/chat' && unreadMessages > 0 ? 'text-violet-300' : to === '/calls' && hasIncomingCall ? 'text-cyan-300' : ''} />
                 {label}
+                {renderNavBadge(to)}
                 {isActive(to) && (
                   <motion.div
                     layoutId="nav-active"
@@ -126,9 +152,20 @@ export const Navbar: React.FC = () => {
                 >
                   <Search size={17} />
                 </button>
-                <button className="relative p-2 rounded-lg text-white/50 hover:text-white/80 hover:bg-white/5 transition-all" title="Notifications">
+                <button
+                  onClick={openNotifications}
+                  className={`relative p-2 rounded-lg transition-all ${
+                    unreadMessages > 0 || hasIncomingCall
+                      ? 'text-violet-300 hover:text-white bg-violet-500/10'
+                      : 'text-white/50 hover:text-white/80 hover:bg-white/5'
+                  }`}
+                  title={hasIncomingCall ? 'Open incoming call' : unreadMessages > 0 ? 'Open unread messages' : 'Open messages'}
+                  aria-label={hasIncomingCall ? 'Open incoming call' : `Notifications${unreadMessages ? `, ${unreadMessages} unread messages` : ''}`}
+                >
                   <Bell size={17} />
-                  <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-violet-500 rounded-full" />
+                  {(unreadMessages > 0 || hasIncomingCall) && (
+                    <span className="absolute top-1 right-1 min-w-2 h-2 rounded-full bg-violet-400 ring-2 ring-black" />
+                  )}
                 </button>
 
                 {/* Profile Dropdown */}
@@ -233,6 +270,7 @@ export const Navbar: React.FC = () => {
                   >
                     <Icon size={16} />
                     {label}
+                    {renderNavBadge(to)}
                   </Link>
                 ))}
                 {isAuthenticated && (

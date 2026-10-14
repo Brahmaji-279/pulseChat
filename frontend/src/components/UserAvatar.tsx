@@ -1,5 +1,6 @@
 import React from 'react';
 import { OnlineIndicator } from './OnlineIndicator.js';
+import { resolveAssetUrl } from '../services/api.js';
 
 interface UserAvatarProps {
   username?: string;
@@ -54,7 +55,7 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
     <div className={`relative inline-block select-none ${className}`}>
       {photoUrl ? (
         <img
-          src={photoUrl}
+          src={resolveAssetUrl(photoUrl)}
           alt={name}
           className={`${sizeDimensions[size]} rounded-full object-cover border border-white/10 shadow-md bg-zinc-900`}
           onError={(e) => {

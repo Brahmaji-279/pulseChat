@@ -116,12 +116,21 @@ interface ChatState {
   // Actions
   loadConversations: () => Promise<void>;
   selectConversation: (conversationId: string) => Promise<void>;
+  leaveConversation: () => void;
   startConversationWithUser: (user: User) => Promise<string>;
   loadMessages: (conversationId: string) => Promise<void>;
   sendMessage: (
     conversationId: string,
     text: string,
-    options?: { type?: 'text' | 'image' | 'file'; attachmentUrl?: string; fileName?: string; fileSize?: number }
+    options?: {
+      type?: 'text' | 'image' | 'file';
+      attachmentUrl?: string;
+      fileName?: string;
+      fileSize?: number;
+      attachmentKey?: string;
+      attachmentIv?: string;
+      attachmentMimeType?: string;
+    }
   ) => Promise<void>;
   sendTyping: (conversationId: string, isTyping: boolean) => void;
   markMessagesRead: (conversationId: string) => void;
@@ -165,6 +174,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     await get().loadMessages(conversationId);
     get().markMessagesRead(conversationId);
+  },
+
+  leaveConversation: () => {
+    set({ activeConversationId: null, activeConversation: null });
   },
 
   startConversationWithUser: async (user: User) => {
@@ -224,6 +237,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
             attachmentUrl: cached?.attachmentUrl,
             fileName: cached?.fileName,
             fileSize: cached?.fileSize,
+            attachmentKey: cached?.attachmentKey,
+            attachmentIv: cached?.attachmentIv,
+            attachmentMimeType: cached?.attachmentMimeType,
             deliveryStatus: raw.deliveryStatus || 'sent',
             timestamp: new Date(raw.createdAt).getTime(),
             createdAt: raw.createdAt,
@@ -265,6 +281,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
               attachmentUrl: opened.attachmentUrl,
               fileName: opened.fileName,
               fileSize: opened.fileSize,
+              attachmentKey: opened.attachmentKey,
+              attachmentIv: opened.attachmentIv,
+              attachmentMimeType: opened.attachmentMimeType,
               deliveryStatus: raw.deliveryStatus || 'delivered',
               timestamp: new Date(raw.createdAt).getTime(),
               createdAt: raw.createdAt,
@@ -350,6 +369,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
       attachmentUrl: options?.attachmentUrl,
       fileName: options?.fileName,
       fileSize: options?.fileSize,
+      attachmentKey: options?.attachmentKey,
+      attachmentIv: options?.attachmentIv,
+      attachmentMimeType: options?.attachmentMimeType,
     };
 
     // 3. Encrypt and sign with ML-KEM-768 + ML-DSA-65 + AES-256-GCM
@@ -379,6 +401,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
       attachmentUrl: payload.attachmentUrl,
       fileName: payload.fileName,
       fileSize: payload.fileSize,
+      attachmentKey: payload.attachmentKey,
+      attachmentIv: payload.attachmentIv,
+      attachmentMimeType: payload.attachmentMimeType,
       deliveryStatus: 'sent',
       timestamp: envelope.timestamp,
       createdAt: new Date(envelope.timestamp).toISOString(),
@@ -594,6 +619,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
           attachmentUrl: opened.attachmentUrl,
           fileName: opened.fileName,
           fileSize: opened.fileSize,
+          attachmentKey: opened.attachmentKey,
+          attachmentIv: opened.attachmentIv,
+          attachmentMimeType: opened.attachmentMimeType,
           deliveryStatus: activeId === convId ? 'read' : 'delivered',
           timestamp: new Date(raw.createdAt).getTime(),
           createdAt: raw.createdAt,
