@@ -7,6 +7,9 @@ import {
   Phone,
   Video,
   User,
+  ArrowRight,
+  Hand,
+  Handshake,
 } from 'lucide-react';
 import { AnimatedBackground } from '../components/AnimatedBackground.js';
 import { GlassPanel } from '../components/GlassPanel.js';
@@ -94,8 +97,8 @@ const features: FeatureCard[] = [
 // ─── Animated Users Visual ─────────────────────────────────────────────────────
 
 const AnimatedUsersVisual: React.FC = () => (
-  <div className="relative flex items-center justify-center gap-8 my-10 select-none">
-    {/* User A */}
+  <div className="relative flex items-center justify-center gap-5 sm:gap-8 my-10 select-none">
+    {/* You */}
     <motion.div
       className="flex flex-col items-center gap-2"
       initial={{ opacity: 0, x: -40 }}
@@ -105,35 +108,77 @@ const AnimatedUsersVisual: React.FC = () => (
       <div className="w-16 h-16 rounded-full bg-violet-600/20 border border-violet-500/40 flex items-center justify-center shadow-lg shadow-violet-900/30">
         <User size={30} className="text-violet-400" />
       </div>
-      <span className="text-xs text-[#F5F5F5]/50 font-mono tracking-widest uppercase">Alice</span>
+      <span className="text-xs text-[#F5F5F5]/70 font-mono tracking-widest uppercase">You</span>
     </motion.div>
 
-    {/* Encrypted line */}
-    <div className="relative flex-1 flex items-center" style={{ minWidth: 120, maxWidth: 220 }}>
-      {/* Static line */}
-      <div className="absolute inset-0 flex items-center">
-        <div className="w-full h-px bg-gradient-to-r from-violet-500/30 via-cyan-400/40 to-violet-500/30" />
-      </div>
+    {/* Greeting, reply, and handshake animation */}
+    <div className="relative h-28 flex-1" style={{ minWidth: 130, maxWidth: 220 }}>
+      <div className="absolute inset-x-0 top-1/2 h-px bg-gradient-to-r from-violet-500/30 via-cyan-400/40 to-violet-500/30" />
 
-      {/* Animated packet A→B */}
       <motion.div
-        className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_10px_3px_rgba(34,211,238,0.5)]"
-        animate={{ x: ['0%', '100%', '0%'] }}
-        transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut', repeatType: 'loop' }}
-        style={{ left: 0 }}
-      />
-
-      {/* Lock icon in center */}
-      <motion.div
-        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#030303] border border-cyan-500/30 rounded-full p-1.5"
-        animate={{ scale: [1, 1.1, 1] }}
-        transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+        className="absolute left-0 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2"
+        animate={{ left: ['0%', '100%', '100%', '100%', '100%'], opacity: [0, 1, 1, 0, 0] }}
+        transition={{ duration: 8, times: [0, 0.25, 0.31, 0.36, 1], repeat: Infinity, ease: 'easeInOut' }}
       >
-        <Lock size={14} className="text-cyan-400" />
+        <span className="flex items-center gap-1 rounded-full border border-cyan-400/40 bg-[#090909] px-2.5 py-1 text-xs font-medium text-cyan-200 shadow-[0_0_14px_2px_rgba(34,211,238,0.22)]">
+          <motion.span
+            animate={{ rotate: [0, 90, 180, 270, 360] }}
+            transition={{ duration: 1.2, repeat: Infinity, ease: 'linear' }}
+          >
+            <ArrowRight size={12} />
+          </motion.span>
+          Hi
+        </span>
+      </motion.div>
+
+      <motion.div
+        className="absolute right-0 top-1/2 z-10 -translate-y-1/2"
+        animate={{ right: ['0%', '0%', '100%', '100%', '100%'], opacity: [0, 0, 1, 1, 0] }}
+        transition={{ duration: 8, times: [0, 0.34, 0.66, 0.72, 0.77], repeat: Infinity, ease: 'easeInOut' }}
+      >
+        <span className="flex items-center gap-1 rounded-full border border-violet-400/40 bg-[#090909] px-2.5 py-1 text-xs font-medium text-violet-200 shadow-[0_0_14px_2px_rgba(139,92,246,0.22)]">
+          <motion.span
+            animate={{ rotate: [0, -90, -180, -270, -360] }}
+            transition={{ duration: 1.2, repeat: Infinity, ease: 'linear' }}
+          >
+            <ArrowRight size={12} />
+          </motion.span>
+          Hello
+        </span>
+      </motion.div>
+
+      <motion.div
+        className="absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2 rounded-full border border-cyan-500/30 bg-[#030303] p-1.5"
+        animate={{ scale: [1, 1, 1.18, 1, 1, 1] }}
+        transition={{ duration: 8, times: [0, 0.27, 0.31, 0.36, 0.67, 1], repeat: Infinity, ease: 'easeInOut' }}
+      >
+        <Lock size={13} className="text-cyan-400" />
+      </motion.div>
+
+      <motion.div
+        className="absolute left-1/2 top-1/2 z-30 -translate-y-1/2 text-violet-300"
+        animate={{ x: [-44, -44, -5, -2, 0], opacity: [0, 0, 1, 1, 0] }}
+        transition={{ duration: 8, times: [0, 0.66, 0.76, 0.84, 0.92], repeat: Infinity, ease: 'easeInOut' }}
+      >
+        <Hand size={21} className="-rotate-90" />
+      </motion.div>
+      <motion.div
+        className="absolute left-1/2 top-1/2 z-30 -translate-y-1/2 text-cyan-300"
+        animate={{ x: [44, 44, 5, 2, 0], opacity: [0, 0, 1, 1, 0] }}
+        transition={{ duration: 8, times: [0, 0.66, 0.76, 0.84, 0.92], repeat: Infinity, ease: 'easeInOut' }}
+      >
+        <Hand size={21} className="rotate-90 scale-x-[-1]" />
+      </motion.div>
+      <motion.div
+        className="absolute left-1/2 top-1/2 z-40 -translate-x-1/2 -translate-y-1/2 text-emerald-300"
+        animate={{ opacity: [0, 0, 0, 1, 1, 0], scale: [0.7, 0.7, 0.7, 1.15, 1, 0.8], rotate: [0, 0, 0, -10, 10, 0] }}
+        transition={{ duration: 8, times: [0, 0.66, 0.75, 0.83, 0.89, 0.96], repeat: Infinity, ease: 'easeInOut' }}
+      >
+        <Handshake size={30} />
       </motion.div>
     </div>
 
-    {/* User B */}
+    {/* Contact */}
     <motion.div
       className="flex flex-col items-center gap-2"
       initial={{ opacity: 0, x: 40 }}
@@ -143,7 +188,7 @@ const AnimatedUsersVisual: React.FC = () => (
       <div className="w-16 h-16 rounded-full bg-cyan-600/20 border border-cyan-500/40 flex items-center justify-center shadow-lg shadow-cyan-900/30">
         <User size={30} className="text-cyan-400" />
       </div>
-      <span className="text-xs text-[#F5F5F5]/50 font-mono tracking-widest uppercase">Bob</span>
+      <span className="text-xs text-[#F5F5F5]/70 font-mono tracking-widest uppercase">Contact</span>
     </motion.div>
   </div>
 );
